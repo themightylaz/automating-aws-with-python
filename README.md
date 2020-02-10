@@ -1,5 +1,6 @@
 # automating-aws-with-python
-A Cloud Guru Course
+
+Repository for the A Cloud Guru course *Automating AWS with Python*
 
 ## 01-webotron
 
