@@ -17,13 +17,10 @@ class DistributionManager:
         """Find a dist matching domain_name."""
         paginator = self.client.get_paginator('list_distributions')
         for page in paginator.paginate():
-            try:
-                for dist in page['DistributionList']['Items']:
-                    for alias in dist['Aliases']['Items']:
-                        if alias == domain_name:
-                            return dist
-            except:
-                continue
+            for dist in page['DistributionList'].get('Items', []):
+                for alias in dist['Aliases']['Items']:
+                    if alias == domain_name:
+                        return dist
         return None
 
     def create_dist(self, domain_name, cert):
