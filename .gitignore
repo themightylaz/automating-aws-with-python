@@ -1,3 +1,4 @@
+config.dev.json
 *.pem
 .DS_Store
 
