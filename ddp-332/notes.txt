@@ -1,0 +1,11 @@
+mkdir ddp-332
+cd ddp-332
+
+pipenv --three
+pipenv install boto3
+pipenv install -d ipython
+pipenv install click
+
+pipenv run ipython
+
+pipenv shell

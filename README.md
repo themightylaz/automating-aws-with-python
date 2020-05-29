@@ -30,3 +30,21 @@ using CloudWatch Events
 Notifon currently has the following features:
 
 - Send notifications to Slack when CloudWatch events happen
+
+
+
+
+
+
+
+
+## ddp-332
+
+aws-user manages temporary aws users for requesting and
+revoking firefighter access.
+
+### features
+
+aws-user currently has the following features:
+
+- List buckets
