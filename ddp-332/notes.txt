@@ -1,11 +1,20 @@
 mkdir ddp-332
 cd ddp-332
+mkdir aws_user
 
 pipenv --three
 pipenv install boto3
 pipenv install -d ipython
 pipenv install click
+pipenv install -d pycodestyle
+pipenv install -d pydocstyle
+pipenv install -d pylint
 
 pipenv run ipython
 
 pipenv shell
+
+python aws_user/aws_user.py
+pycodestyle aws_user/aws_user.py
+pydocstyle aws_user/aws_user.py
+pylint aws_user/aws_user.py
