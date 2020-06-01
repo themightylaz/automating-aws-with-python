@@ -18,3 +18,4 @@ python aws_user/aws_user.py
 pycodestyle aws_user/aws_user.py
 pydocstyle aws_user/aws_user.py
 pylint aws_user/aws_user.py
+pipenv install -d pyflakes
