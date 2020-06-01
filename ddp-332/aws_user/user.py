@@ -5,9 +5,10 @@
 
 import string
 import random
+import shelve
 
 from botocore.exceptions import ClientError
-from tags import get_tags
+from aws_user.tags import get_tags
 
 
 class UserManager:
@@ -17,39 +18,17 @@ class UserManager:
         """Create a UserManager object."""
         self.session = session
         self.iam_client = self.session.client('iam')
-        self.__user_name = ''
-        self.__access_key = ''
-        self.__secret_key = ''
+        self.__userdata = {}
 
     @property
-    def user_name(self):
-        """Getter function for user_name."""
-        return self.__user_name
+    def userdata(self):
+        """Getter function for userdata."""
+        return self.__userdata
 
-    @property
-    def access_key(self):
-        """Getter function for access_key."""
-        return self.__access_key
-
-    @property
-    def secret_key(self):
-        """Getter function for secret_key."""
-        return self.__secret_key
-
-    @user_name.setter
-    def user_name(self, username):
+    @userdata.setter
+    def userdata(self, userdata):
         """Setter function for user_name."""
-        self.__user_name = username
-
-    @access_key.setter
-    def access_key(self, accesskey):
-        """Setter function for access_key."""
-        self.__access_key = accesskey
-
-    @secret_key.setter
-    def secret_key(self, secretkey):
-        """Setter function for secret_key."""
-        self.__secret_key = secretkey
+        self.__userdata = userdata
 
     def all_users(self):
         """Get an iterator for all k8s-console users."""
@@ -96,11 +75,44 @@ class UserManager:
         username = user['User']['UserName']
         accesskey = self.create_access_key(username)
 
-        self.user_name = username
-        self.access_key = accesskey['AccessKey']['AccessKeyId']
-        self.secret_key = accesskey['AccessKey']['SecretAccessKey']
+        self.userdata = {
+            'UserName': username,
+            'AccessKey': accesskey['AccessKey']['AccessKeyId'],
+            'SecretKey': accesskey['AccessKey']['SecretAccessKey']
+        }
+
+        with shelve.open('userdata.db') as db:
+            userdata_without_secret = self.userdata
+            userdata_without_secret['SecretKey'] = '<hidden>'
+            db[username] = userdata_without_secret
+
+    def print_userdata(self):
+        """Print out details for generated user."""
+        print('UserName = {}\nAccessKeyId = {}\nSecretAccessKey = {}'
+              .format(
+                  self.userdata['UserName'],
+                  self.userdata['AccessKey'],
+                  self.userdata['SecretKey']
+              ))
+
+    def list_user_details(self, username):
+        """Print out details for an existing user."""
+        with shelve.open('userdata.db') as db:
+            self.userdata = db[username]
+        self.print_userdata()
 
     def delete_user(self, username, accesskeyid):
         """Delete a given k8s-console user."""
         self.delete_access_key(username, accesskeyid)
         self.iam_client.delete_user(UserName=username)
+
+    def delete_stored_user(self, username):
+        """Delete a given k8s-console user."""
+        with shelve.open('userdata.db') as db:
+            self.userdata = db[username]
+
+        if username == self.userdata['UserName']:
+            self.delete_access_key(username, self.userdata['AccessKey'])
+            self.iam_client.delete_user(UserName=username)
+        else:
+            print('Warning: User {} does not exist.'.format(username))

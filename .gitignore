@@ -1,3 +1,4 @@
+userdata.db
 node_modules/
 config.dev.json
 *.pem

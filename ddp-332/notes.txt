@@ -14,8 +14,19 @@ pipenv run ipython
 
 pipenv shell
 
-python aws_user/aws_user.py
 pycodestyle aws_user/aws_user.py
 pydocstyle aws_user/aws_user.py
 pylint aws_user/aws_user.py
 pipenv install -d pyflakes
+
+python aws_user/aws_user.py
+python -m aws_user.aws_user --profile=pt-operator --help
+
+pipenv install -d setuptools
+
+python setup.py bdist_wheel
+
+STH-C02XW07UJGH7:ddp-332 larnis$ pwd
+/Users/larnis/dev/codebase/automating-aws-with-python/ddp-332
+
+pip3 install dist/aws_user-0.1-py3-none-any.whl

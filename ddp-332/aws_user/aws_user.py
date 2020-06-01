@@ -13,7 +13,7 @@ aws-user automates the process of creating and deleteing temporary users.
 import boto3
 import click
 
-from user import UserManager
+from aws_user.user import UserManager
 
 session = None
 user_manager = None
@@ -44,20 +44,30 @@ def list_users():
 def generate_user():
     """Generate a k8s-console user."""
     user_manager.generate_user()
-    print('UserName = {}\nAccessKeyId = {}\nSecretAccessKey = {}'
-          .format(
-              user_manager.user_name,
-              user_manager.access_key,
-              user_manager.secret_key
-          ))
+    user_manager.print_userdata()
 
 
+# @cli.command('delete-user')
+# @click.argument('username')
+# @click.argument('accesskeyid')
+# def delete_user(username, accesskeyid):
+#     """Delete a given k8s-console user."""
+#     user_manager.delete_user(username, accesskeyid)
+
+
+# @cli.command('delete-stored-user')
 @cli.command('delete-user')
 @click.argument('username')
-@click.argument('accesskeyid')
-def delete_user(username, accesskeyid):
+def delete_stored_user(username):
     """Delete a given k8s-console user."""
-    user_manager.delete_user(username, accesskeyid)
+    user_manager.delete_stored_user(username)
+
+
+@cli.command('list-user-details')
+@click.argument('username')
+def list_user_details(username):
+    """Delete a given k8s-console user."""
+    user_manager.list_user_details(username)
 
 
 if __name__ == '__main__':
