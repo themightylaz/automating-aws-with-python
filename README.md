@@ -47,4 +47,7 @@ revoking firefighter access.
 
 aws-user currently has the following features:
 
-- List buckets
+- List k8s-console users
+- Generate a k8s-console user
+- Delete a specified k8s-console user
+- Set AWS profile with --profile=<profileName>

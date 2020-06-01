@@ -15,15 +15,22 @@ import click
 
 from user import UserManager
 
-
-session = boto3.Session(profile_name='pt-operator')
-user_manager = UserManager(session)
+session = None
+user_manager = None
 
 
 @click.group()
-def cli():
+@click.option('--profile', default=None, help="Use a given AWS profile.")
+def cli(profile):
     """aws-user manages AWS temporary users for firefighter access."""
-    pass
+    global session, user_manager
+
+    session_cfg = {}
+    if profile:
+        session_cfg['profile_name'] = profile
+
+    session = boto3.Session(**session_cfg)
+    user_manager = UserManager(session)
 
 
 @cli.command('list-users')
