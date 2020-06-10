@@ -2,50 +2,74 @@
 
 """Classes for IAM users."""
 
-
 import string
-import random
-import shelve
+import time
 
+from pprint import pprint
 from botocore.exceptions import ClientError
-from aws_user.tags import get_tags
+
+from aws_user.utils import gen_random_string
 
 
 class UserManager:
     """Manage k8s-console temporary users."""
 
-    def __init__(self, session):
+    AWS_TAGS = [{'Key': 'CostCenter', 'Value': 'D2'},
+                {'Key': 'Service', 'Value': 'k8s-console'},
+                {'Key': 'Team', 'Value': 'DPML'},
+                {'Key': 'Department', 'Value': 'Data'},
+                {'Key': 'Jira', 'Value': 'DDP-332'}]
+
+    DAY_AND_NIGHT = 0  # SHOULD BE SET WHEN TESTING DONE: 60 * 60 * 24
+
+    def __init__(self, session, label_selector, expire_annotation):
         """Create a UserManager object."""
         self.session = session
+        self.label_selector = label_selector
+        self.expire_annotation = expire_annotation
+
+        self.now = time.time()
+        self.success = 200
+
         self.iam_client = self.session.client('iam')
-        self.__userdata = {}
 
-    @property
-    def userdata(self):
-        """Getter function for userdata."""
-        return self.__userdata
+    @staticmethod
+    def generate_username(size=10, chars=string.ascii_lowercase + string.digits):
+        """Generate a user name with random suffix."""
+        suffix = gen_random_string(size, chars)
+        return 'k8s-console-temp-user-' + suffix
 
-    @userdata.setter
-    def userdata(self, userdata):
-        """Setter function for user_name."""
-        self.__userdata = userdata
+    def get_tags(self):
+        """Get aws tags with label_selector included."""
+        tags = self.AWS_TAGS
 
-    def all_users(self):
-        """Get an iterator for all k8s-console users."""
-        user_list = self.iam_client.list_users(MaxItems=100)
-        k8s_user_list = []
+        label_selector = self.label_selector.split('=')
+        label_tag = {'Key': label_selector[0], 'Value': label_selector[1]}
+        tags.append(label_tag)
 
-        for user in user_list['Users']:
-            filter_dict = {k: v for (k, v) in user.items() if 'UserName' in k}
-            filter_value = filter_dict.get('UserName')
-            if filter_value.startswith('k8s-console-temp-user-'):
-                k8s_user_list.append(filter_value)
+        annotation_tag = {'Key': self.expire_annotation, 'Value': str(int(self.now + self.DAY_AND_NIGHT))}
+        tags.append(annotation_tag)
 
-        return k8s_user_list
+        return tags
 
-    def create_access_key(self, username):
-        """Create access key pair for given user."""
-        return self.iam_client.create_access_key(UserName=username)
+    def generate_user(self):
+        """Generate a k8s-console user."""
+        user = self.iam_client.create_user(
+            UserName=self.generate_username(),
+            Tags=self.get_tags()
+        )
+
+        username = user['User']['UserName']
+        accesskey = self.iam_client.create_access_key(UserName=username)
+
+        print('UserName = {}\nAccessKeyId = {}\nSecretAccessKey = {}'
+              .format(
+                  username,
+                  accesskey['AccessKey']['AccessKeyId'],
+                  accesskey['AccessKey']['SecretAccessKey']
+              ))
+
+        return username, user['User']['Arn']
 
     def delete_access_key(self, username, accesskeyid):
         """Delete access key pair for given user."""
@@ -57,62 +81,38 @@ class UserManager:
         except ClientError as error:
             if error.response['Error']['Code'] == 'NoSuchEntityException':
                 pass
-            else:
-                raise
 
-    @staticmethod
-    def generate_username(size=10, chars=string.ascii_lowercase + string.digits):
-        """Generate a user name with random suffix."""
-        suffix = ''.join(random.choice(chars) for _ in range(size))
-        return 'k8s-console-temp-user-' + suffix
+    def delete_expired_aws_users(self):
+        """Delete expired k8s-console aws users."""
+        user_list = self.iam_client.list_users(MaxItems=100)
+        arn_list = []
 
-    def generate_user(self):
-        """Generate a k8s-console user."""
-        user = self.iam_client.create_user(
-            UserName=self.generate_username(),
-            Tags=get_tags()
-        )
-        username = user['User']['UserName']
-        accesskey = self.create_access_key(username)
+        for user in user_list['Users']:
+            user_name = user['UserName']
+            user_tags = self.iam_client.list_user_tags(UserName=user_name)
+            if {'Key': 'kindredgroup.com/temp-access-resource', 'Value': 'true'} in user_tags['Tags']:
+                user_arn = user['Arn']
 
-        self.userdata = {
-            'UserName': username,
-            'AccessKey': accesskey['AccessKey']['AccessKeyId'],
-            'SecretKey': accesskey['AccessKey']['SecretAccessKey']
-        }
+                for tag in user_tags['Tags']:
+                    tag_values = list(tag.values())
+                    if tag_values[0] == 'kindredgroup.com/expireTimestamp':
+                        expire_timestamp = int(tag_values[1])
 
-        with shelve.open('userdata.db') as db:
-            userdata_without_secret = self.userdata
-            userdata_without_secret['SecretKey'] = '<hidden>'
-            db[username] = userdata_without_secret
+                if not expire_timestamp:
+                    print("User: name={} does not have {} annotation!".format(user_name, self.expire_annotation))
+                elif expire_timestamp < self.now:
+                    print("User: name={} is expired! Removing it ... ".format(user_name))
+                    accesskeyids = self.iam_client.list_access_keys(UserName=user_name)
 
-    def print_userdata(self):
-        """Print out details for generated user."""
-        print('UserName = {}\nAccessKeyId = {}\nSecretAccessKey = {}'
-              .format(
-                  self.userdata['UserName'],
-                  self.userdata['AccessKey'],
-                  self.userdata['SecretKey']
-              ))
+                    for accesskeyid in accesskeyids['AccessKeyMetadata']:
+                        self.delete_access_key(user_name, accesskeyid['AccessKeyId'])
 
-    def list_user_details(self, username):
-        """Print out details for an existing user."""
-        with shelve.open('userdata.db') as db:
-            self.userdata = db[username]
-        self.print_userdata()
+                    response = self.iam_client.delete_user(UserName=user_name)
+                    if response['ResponseMetadata']['HTTPStatusCode'] == self.success:
+                        print("User: name={} is removed!".format(user_name))
+                    else:
+                        pprint(response)
 
-    def delete_user(self, username, accesskeyid):
-        """Delete a given k8s-console user."""
-        self.delete_access_key(username, accesskeyid)
-        self.iam_client.delete_user(UserName=username)
+                    arn_list.append(user_arn)
 
-    def delete_stored_user(self, username):
-        """Delete a given k8s-console user."""
-        with shelve.open('userdata.db') as db:
-            self.userdata = db[username]
-
-        if username == self.userdata['UserName']:
-            self.delete_access_key(username, self.userdata['AccessKey'])
-            self.iam_client.delete_user(UserName=username)
-        else:
-            print('Warning: User {} does not exist.'.format(username))
+        return arn_list

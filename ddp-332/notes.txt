@@ -9,6 +9,7 @@ pipenv install click
 pipenv install -d pycodestyle
 pipenv install -d pydocstyle
 pipenv install -d pylint
+pipenv install kubernetes
 
 pipenv run ipython
 
@@ -24,9 +25,266 @@ python -m aws_user.aws_user --profile=pt-operator --help
 
 pipenv install -d setuptools
 
-python setup.py bdist_wheel
+python setup.py bdist_wheel # in pipenv shell
 
 STH-C02XW07UJGH7:ddp-332 larnis$ pwd
 /Users/larnis/dev/codebase/automating-aws-with-python/ddp-332
 
 pip3 install dist/aws_user-0.1-py3-none-any.whl
+pip3 show aws-user
+
+pip3 uninstall dist/aws_user-0.1-py3-none-any.whl
+
+STH-C02XW07UJGH7:ddp-332 larnis$ aws_user
+Usage: aws_user [OPTIONS] COMMAND [ARGS]...
+
+  aws-user manages AWS temporary users for firefighter access.
+
+Options:
+  --profile TEXT            Use a given AWS profile.
+  --kubeconfig TEXT         Use a KUBECONFIG file name.
+  --clustername TEXT        Use a EKS cluster name.
+  --namespace TEXT          Use a K8S namespace.
+  --label_selector TEXT     Use a K8S label selector.
+  --expire_annotation TEXT  Use a K8S expire annotation.
+  --help                    Show this message and exit.
+
+Commands:
+  create-temp-aws-k8s-resources   Generate temp firefighter resources.
+  delete-expired-aws-k8s-resources
+                                  Delete expired firefighter resources.
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
+STH-C02XW07UJGH7:~ larnis$ export AWS_PROFILE=pt-operator
+
+STH-C02XW07UJGH7:~ larnis$ eksctl get iamidentitymapping --cluster operator-pt1-kafka
+ARN									USERNAME				GROUPS
+arn:aws:iam::749050461047:role/AWS-D2-Development-Administrators	dp-admin				system:masters
+arn:aws:iam::749050461047:role/AWS-D2-Development-Test-role		aws-d2-development-test
+arn:aws:iam::749050461047:role/AWS_D2_Development_BDS			bds
+arn:aws:iam::749050461047:role/AWS_D2_Development_BI			bi
+arn:aws:iam::749050461047:role/AWS_D2_Development_Bigdata		big-data				system:masters
+arn:aws:iam::749050461047:role/AWS_D2_Development_DataScience		data-science
+arn:aws:iam::749050461047:role/AWS_D2_Development_QA			qa
+arn:aws:iam::749050461047:role/AWS_D2_Firefighter			firefighters
+arn:aws:iam::749050461047:role/AWS_D2_Group_Security			aws-d2-group-security
+arn:aws:iam::749050461047:role/DefaultD2EksWorkersRole			system:node:{{EC2PrivateDNSName}}	system:bootstrappers,system:nodes
+arn:aws:iam::749050461047:user/amo-pe-jenkins-service-user		amo-pe-jenkins
+arn:aws:iam::749050461047:user/d2-k8s-console-user			d2-k8s-console
+
+STH-C02XW07UJGH7:~ larnis$  eksctl create iamidentitymapping --cluster operator-pt1-kafka --arn arn:aws:iam::749050461047:user/k8s-console-temp-user-1x9lsxp49z  --username k8s-console-temp-user-1x9lsxp49z
+[ℹ]  eksctl version 0.20.0
+[ℹ]  using region eu-central-1
+[ℹ]  adding identity "arn:aws:iam::749050461047:user/k8s-console-temp-user-1x9lsxp49z" to auth ConfigMap
+
+STH-C02XW07UJGH7:ddp-332 larnis$ kubectl describe cm aws-auth -n kube-system
+
+STH-C02XW07UJGH7:~ larnis$ eksctl delete iamidentitymapping --cluster operator-pt1-kafka --arn arn:aws:iam::749050461047:user/k8s-console-temp-user-1x9lsxp49z
+[ℹ]  eksctl version 0.20.0
+[ℹ]  using region eu-central-1
+[ℹ]  removing identity "arn:aws:iam::749050461047:user/k8s-console-temp-user-1x9lsxp49z" from auth ConfigMap (username = "k8s-console-temp-user-1x9lsxp49z", groups = [])
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
+In [125]: import os
+
+In [126]: from kubernetes import client, config
+
+In [127]: config.load_kube_config(os.path.join(os.environ["HOME"], '.kube/config-eks-new-pt1'))
+
+In [128]: v1 = client.CoreV1Api()
+
+In [129]: pod_list = v1.list_namespaced_pod("confluent")
+
+In [130]: for pod in pod_list.items:
+     ...:     print("%s\t%s\t%s" % (pod.metadata.name, pod.status.phase, pod.status.pod_ip))
+     ...:
+cc-manager-75cd594fbf-zgbms	Running	10.77.33.169
+cc-operator-66c454bf99-rhjnc	Running	10.77.32.116
+connectors-0	Running	10.77.35.71
+connectors-1	Running	10.77.35.181
+controlcenter-0	Running	10.77.33.25
+kafka-0	Running	10.77.34.15
+kafka-1	Running	10.77.33.115
+kafka-2	Running	10.77.32.40
+kafka-3	Running	10.77.37.19
+ksql-0	Running	10.77.32.34
+mypodjava	Running	10.77.33.31
+schemaregistry-0	Running	10.77.32.12
+schemaregistry-1	Running	10.77.33.8
+test-avro-client	Running	10.77.35.81
+test-kafka-client	Running	10.77.34.133
+zookeeper-0	Running	10.77.33.228
+zookeeper-1	Running	10.77.36.139
+zookeeper-2	Running	10.77.34.87
+zookeeper-3	Running	10.77.32.220
+zookeeper-4	Running	10.77.37.138
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
+(ddp-332) (⎈ |eks_operator-pt1-kafka:confluent)bash-3.2$ python -m aws_user.aws_user --profile=d2-k8s-console-user --kubeconfig=config-eks-new-pt1-k8s-console generate-user
+UserName = k8s-console-temp-user-65i39ke8h3
+Arn = arn:aws:iam::749050461047:user/k8s-console-temp-user-65i39ke8h3
+CreateDate = 2020-06-07 16:09:46+00:00
+AccessKeyId = AKIA24ZXC7N3RVIU2OPV
+SecretAccessKey = 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
+User k8s-console-temp-user-65i39ke8h3 created.
+Role k8s-console-temp-role-vccoj38ahd created.
+Role-binding k8s-console-temp-rolebinding-owckf30mzh created.
+Configmap aws-auth updated with arn arn:aws:iam::749050461047:user/k8s-console-temp-user-65i39ke8h3.
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
+STH-C02XW07UJGH7:ddp-332 larnis$ export AWS_PROFILE=amo-pe-jenkins
+
+STH-C02XW07UJGH7:ddp-332 larnis$ aws-iam-authenticator token -i eks_operator-pt1-kafka
+{"kind":"ExecCredential","apiVersion":"client.authentication.k8s.io/v1alpha1","spec":{},"status":{"expirationTimestamp":"2020-06-04T09:21:39Z","token":"k8s-aws-v1.aHR0cHM6Ly9zdHMuYW1hem9uYXdzLmNvbS8_QWN0aW9uPUdldENhbGxlcklkZW50aXR5JlZlcnNpb249MjAxMS0wNi0xNSZYLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUEyNFpYQzdOM1ZYVERUM0s2JTJGMjAyMDA2MDQlMkZ1cy1lYXN0LTElMkZzdHMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDIwMDYwNFQwOTA3MzlaJlgtQW16LUV4cGlyZXM9MCZYLUFtei1TaWduZWRIZWFkZXJzPWhvc3QlM0J4LWs4cy1hd3MtaWQmWC1BbXotU2lnbmF0dXJlPTdhMDU3YWRhYWFjNzUzOWJhM2E5ZDM3MjcwYTY4MmNhZmY2N2M5NDIzNDViMjg1NTgyYzliMzVlODFhOGY4YWY"}}
+
+STH-C02XW07UJGH7:ddp-332 larnis$ aws-iam-authenticator verify -i eks_operator-pt1-kafka -t k8s-aws-v1.aHR0cHM6Ly9zdHMuYW1hem9uYXdzLmNvbS8_QWN0aW9uPUdldENhbGxlcklkZW50aXR5JlZlcnNpb249MjAxMS0wNi0xNSZYLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUEyNFpYQzdOM1ZYVERUM0s2JTJGMjAyMDA2MDQlMkZ1cy1lYXN0LTElMkZzdHMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDIwMDYwNFQwOTA3MzlaJlgtQW16LUV4cGlyZXM9MCZYLUFtei1TaWduZWRIZWFkZXJzPWhvc3QlM0J4LWs4cy1hd3MtaWQmWC1BbXotU2lnbmF0dXJlPTdhMDU3YWRhYWFjNzUzOWJhM2E5ZDM3MjcwYTY4MmNhZmY2N2M5NDIzNDViMjg1NTgyYzliMzVlODFhOGY4YWY
+&{ARN:arn:aws:iam::749050461047:user/amo-pe-jenkins-service-user CanonicalARN:arn:aws:iam::749050461047:user/amo-pe-jenkins-service-user AccountID:749050461047 UserID:AIDA24ZXC7N3SY562AGDU SessionName: AccessKeyID:AKIA24ZXC7N3VXTDT3K6}
+
+aws eks get-token --cluster-name operator-pt1-kafka
+
+aws sts get-caller-identity
+
+aws sts assume-role --role-arn arn:aws:iam::749050461047:role/operator-pt-kafka-cluster --role-session-name pt1
+
+STH-C02XW07UJGH7:ddp-332 larnis$ pipenv run ipython
+
+In [1]: import os
+
+In [2]: from kubernetes import client, config
+
+In [3]: config.load_kube_config(os.path.join(os.environ["HOME"], '.kube/config-eks-new-pt1-amo-pe-jenkins'))
+
+In [4]: v1 = client.CoreV1Api()
+
+In [14]: rules = [
+    ...:         client.V1PolicyRule([""], resources=["pods"], verbs=["get", "list", "create", "delete", "update"], ),
+    ...:         client.V1PolicyRule(["extensions"], resources=["deployments", "replicasets"],
+    ...:                                        verbs=["get", "list", "create", "delete", "update"], )
+    ...:     ]
+
+In [15]: role = client.V1Role(rules=rules)
+
+In [16]: role.metadata = client.V1ObjectMeta(namespace="confluent", name="user-test-role")
+
+In [17]: rbac = client.RbacAuthorizationV1Api()
+
+In [18]: pretty = 'true'
+
+In [19]: rbac_response = rbac.create_namespaced_role("confluent", role, pretty=pretty)
+
+In [11]: rbac_response
+Out[11]:
+{'api_version': 'rbac.authorization.k8s.io/v1',
+ 'kind': 'Role',
+ 'metadata': {'annotations': None,
+              'cluster_name': None,
+              'creation_timestamp': datetime.datetime(2020, 6, 4, 9, 44, 9, tzinfo=tzutc()),
+              'deletion_grace_period_seconds': None,
+              'deletion_timestamp': None,
+              'finalizers': None,
+              'generate_name': None,
+              'generation': None,
+              'initializers': None,
+              'labels': None,
+              'managed_fields': None,
+              'name': 'user-test-role',
+              'namespace': 'confluent',
+              'owner_references': None,
+              'resource_version': '76830610',
+              'self_link': '/apis/rbac.authorization.k8s.io/v1/namespaces/confluent/roles/user-test-role',
+              'uid': 'a79a387a-ec1d-4469-a784-1fcf5e1bd87c'},
+ 'rules': [{'api_groups': [''],
+            'non_resource_ur_ls': None,
+            'resource_names': None,
+            'resources': ['pods'],
+            'verbs': ['get', 'list', 'create', 'delete', 'update']},
+           {'api_groups': ['extensions'],
+            'non_resource_ur_ls': None,
+            'resource_names': None,
+            'resources': ['deployments', 'replicasets'],
+            'verbs': ['get', 'list', 'create', 'delete', 'update']}]}
+
+In [12]: role_binding = client.V1RoleBinding(
+    ...:     metadata=client.V1ObjectMeta(namespace="confluent", name="user-test-role-binding"),
+    ...:     subjects=[client.V1Subject(name="etl-glue-user", kind="User", api_group="rbac.authorization.k8s.io")],
+    ...:     role_ref=client.V1RoleRef(kind="Role", api_group="rbac.authorization.k8s.io", name="user-test-role"))
+
+In [13]: rbac = client.RbacAuthorizationV1Api()
+
+In [14]: rbac.create_namespaced_role_binding(namespace="confluent", body=role_binding)
+Out[14]:
+{'api_version': 'rbac.authorization.k8s.io/v1',
+ 'kind': 'RoleBinding',
+ 'metadata': {'annotations': None,
+              'cluster_name': None,
+              'creation_timestamp': datetime.datetime(2020, 6, 4, 9, 53, 49, tzinfo=tzutc()),
+              'deletion_grace_period_seconds': None,
+              'deletion_timestamp': None,
+              'finalizers': None,
+              'generate_name': None,
+              'generation': None,
+              'initializers': None,
+              'labels': None,
+              'managed_fields': None,
+              'name': 'user-test-role-binding',
+              'namespace': 'confluent',
+              'owner_references': None,
+              'resource_version': '76832849',
+              'self_link': '/apis/rbac.authorization.k8s.io/v1/namespaces/confluent/rolebindings/user-test-role-binding',
+              'uid': '5e416d5a-6d4f-44e3-9075-53e10386695a'},
+ 'role_ref': {'api_group': 'rbac.authorization.k8s.io',
+              'kind': 'Role',
+              'name': 'user-test-role'},
+ 'subjects': [{'api_group': 'rbac.authorization.k8s.io',
+               'kind': 'User',
+               'name': 'etl-glue-user',
+               'namespace': None}]}
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
+pipenv run ipython
+
+import os
+
+from kubernetes import client, config
+
+config.load_kube_config(os.path.join(os.environ["HOME"], '.kube/config-eks-new-pt1-k8s-console'))
+
+rbac = client.RbacAuthorizationV1Api()
+
+rbac_response = rbac.create_namespaced_role("confluent", role, pretty=pretty)
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
+(ddp-332) (⎈ |eks_operator-pt1-kafka:confluent)bash-3.2$ python -m aws_user.aws_user --profile=d2-k8s-console-user --kubeconfig=config-eks-new-pt1-k8s-console list-aws-auth operator-pt1-kafka
+('ARN\t\t\t\t\t\t\t\t\tUSERNAME\t\t\t\tGROUPS\n'
+ 'arn:aws:iam::749050461047:role/AWS-D2-Development-Administrators\t'
+ 'dp-admin\t\t\t\tsystem:masters\n'
+ 'arn:aws:iam::749050461047:role/AWS-D2-Development-Test-role\t\t'
+ 'aws-d2-development-test\t\t\t\n'
+ 'arn:aws:iam::749050461047:role/AWS_D2_Development_BDS\t\t\tbds\t\t\t\t\t\n'
+ 'arn:aws:iam::749050461047:role/AWS_D2_Development_BI\t\t\tbi\t\t\t\t\t\n'
+ 'arn:aws:iam::749050461047:role/AWS_D2_Development_Bigdata\t\tbig-data\t\t\t\t'
+ 'system:masters\n'
+ 'arn:aws:iam::749050461047:role/AWS_D2_Development_DataScience\t\t'
+ 'data-science\t\t\t\t\n'
+ 'arn:aws:iam::749050461047:role/AWS_D2_Development_QA\t\t\tqa\t\t\t\t\t\n'
+ 'arn:aws:iam::749050461047:role/AWS_D2_Firefighter\t\t\tfirefighters\t\t\t\t\n'
+ 'arn:aws:iam::749050461047:role/AWS_D2_Group_Security\t\t\t'
+ 'aws-d2-group-security\t\t\t\n'
+ 'arn:aws:iam::749050461047:role/DefaultD2EksWorkersRole\t\t\t'
+ 'system:node:{{EC2PrivateDNSName}}\tsystem:bootstrappers,system:nodes\n'
+ 'arn:aws:iam::749050461047:user/amo-pe-jenkins-service-user\t\t'
+ 'amo-pe-jenkins\t\t\t\t\n'
+ 'arn:aws:iam::749050461047:user/d2-k8s-console-user\t\t\t'
+ 'd2-k8s-console\t\t\t\t\n')

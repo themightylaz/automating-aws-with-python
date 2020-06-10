@@ -8,10 +8,11 @@ setup(
     description='aws-user is a tool to manage k8s-console users in AWS',
     license='GPLv3+',
     packages=['aws_user'],
-    url='https://github.com/themightylaz/automating-aws-with-python',
+    url='https://github.com/themightylaz',
     install_requires=[
         'click',
-        'boto3'
+        'boto3',
+        'kubernetes'
     ],
     entry_points='''
         [console_scripts]
