@@ -32,12 +32,6 @@ Notifon currently has the following features:
 - Send notifications to Slack when CloudWatch events happen
 
 
-
-
-
-
-
-
 ## ddp-332 (aws_user)
 
 aws-user manages temporary aws and k8s resources for requesting and revoking firefighter access.
